@@ -1,14 +1,32 @@
 from maya import cmds
 
-def rename():
-    selection = cmds.ls(selection=True)
+SUFFIXES = {
+    "mesh": "geo",
+    "nurbsCurve": "nur",
+    "camera": None,
+    "ambientLight": "lgt"
+}
 
-    if len(selection) == 0:
-        selection = cmds.ls(dag=True, long=True)
+DEFAULT_SUFFIX = "grp"
 
-    selection.sort(key=len, reverse=True)
+def rename(selection=False):
+    """
+    This function will rename amy objects to have the correct suffix
+    Args:
+        selection: Whether or not we use the current selection
 
-    for obj in selection:
+    Returns:
+        A list of all the objects we operated on
+
+    """
+    objects = cmds.ls(selection=selection, dag=True, long=True)
+
+    if selection and not objects:
+        raise RuntimeError("Select a object, idiot!")
+
+    objects.sort(key=len, reverse=True)
+
+    for obj in objects:
         shortName = obj.split("|")[-1]
 
         children = cmds.listRelatives(obj, children=True, fullPath=True) or []
@@ -19,16 +37,19 @@ def rename():
         else:
             objType = cmds.objectType(obj)
 
-        if objType == "mesh":
-            suffix = "geo"
-        elif objType == "nurbsCurve":
-            suffix = "nur"
-        elif objType == "camera":
-            print "Skipping camera"
-            continue
-        else:
-            suffix = "grp"
+        suffix = SUFFIXES.get(objType, DEFAULT_SUFFIX)
 
-        newName = shortName + "_" + suffix
+        if not suffix:
+            continue
+
+        if obj.endswith("_" + suffix):
+            continue
+
+        newName = "{0}_{1}".format(shortName, suffix)
 
         cmds.rename(obj, newName)
+
+        index = objects.index(obj)
+        objects[index] = obj.replace(shortName, newName)
+
+    return objects
